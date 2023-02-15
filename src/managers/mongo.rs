@@ -25,25 +25,23 @@ impl Mongo {
         Self { client }
     }
 
-    pub async fn response_add(&self, ctx: Context, _type: ResponseType, msg: &str) -> Result<()> {
+    pub async fn response_add(&self, ctx: Context, tipe: ResponseType, msg: &str) -> Result<()> {
         let db = self.client.database("discord");
         let new_doc = doc! {
-            "type": _type.to_string(),
+            "type": tipe.to_string(),
             "message": msg
         };
 
-        let _ = db
-            .collection("response")
-            .insert_one(new_doc, None)
-            .await
-            .expect("Unable to insert response");
+        let _ = db.collection("response").insert_one(new_doc, None).await?;
 
         let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<Response>().unwrap();
+        let cache = data
+            .get_mut::<Response>()
+            .ok_or(eyre::eyre!("Unable to get cache"))?;
         cache.insert(
-            _type.to_string(),
+            tipe.to_string(),
             Response {
-                type_field: _type.to_string(),
+                type_field: tipe.to_string(),
                 message: msg.to_string(),
             },
         );
@@ -55,14 +53,15 @@ impl Mongo {
         let res: Document = db
             .collection("response")
             .find_one_and_delete(doc! { "message": msg}, None)
-            .await
-            .expect("Unable to delete response")
-            .ok_or_else(|| eyre::eyre!("Unable to find response"))?;
+            .await?
+            .ok_or(eyre::eyre!("Unable to find response"))?;
 
         let res_id = res.get_object_id("_id").unwrap().to_string();
 
         let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<Response>().unwrap();
+        let cache = data
+            .get_mut::<Response>()
+            .ok_or(eyre::eyre!("Unable to get cache"))?;
         cache.remove(&res_id);
 
         Ok(())

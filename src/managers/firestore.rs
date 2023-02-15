@@ -1,13 +1,13 @@
 use super::super::settings::Settings;
 use firestore::FirestoreDb;
 
-pub struct FirestoreManager {
+pub struct FSManager {
     pub client: FirestoreDb,
     #[allow(dead_code)]
     key_file: String,
 }
 
-impl FirestoreManager {
+impl FSManager {
     pub async fn new() -> Self {
         let settings = Settings::new();
         // std::env::set_var(

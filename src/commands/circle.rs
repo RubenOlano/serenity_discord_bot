@@ -89,67 +89,67 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 
     let name = match name {
         CommandDataOptionValue::String(name) => name,
-        _ => panic!("No name provided"),
+        _ => Err(eyre::eyre!("No name provided"))?,
     };
 
     let description = options
         .get(1)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No description provided")?;
 
     let description = match description {
         CommandDataOptionValue::String(description) => description,
-        _ => panic!("No description provided"),
+        _ => Err(eyre::eyre!("No description provided"))?,
     };
 
     let color = options
         .get(2)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No color provided")?;
 
     let color = match color {
         CommandDataOptionValue::String(color) => color,
-        _ => panic!("No color provided"),
+        _ => Err(eyre::eyre!("No color provided"))?,
     };
 
     let emoji = options
         .get(3)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No emoji provided")?;
 
     let emoji = match emoji {
         CommandDataOptionValue::String(emoji) => emoji,
-        _ => panic!("No emoji provided"),
+        _ => Err(eyre::eyre!("No emoji provided"))?,
     };
 
     let graphic = options
         .get(4)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No graphic provided")?;
 
     let graphic = match graphic {
         CommandDataOptionValue::String(graphic) => graphic,
-        _ => panic!("No graphic provided"),
+        _ => Err(eyre::eyre!("No graphic provided"))?,
     };
 
     let owner = options
         .get(5)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No owner provided")?;
 
     let owner = match owner {
         CommandDataOptionValue::User(owner, _member) => owner,
-        _ => panic!("No owner provided"),
+        _ => Err(eyre::eyre!("No owner provided"))?,
     };
 
     if !test_emoji(emoji) {
@@ -175,7 +175,7 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     let everyone = everyone
         .iter()
         .find(|(_id, role)| role.name == "@everyone")
-        .expect("No @everyone role found");
+        .ok_or(eyre::eyre!("No @everyone role found"))?;
 
     let res = guild_id
         .create_channel(&ctx.http, |c| {
@@ -215,7 +215,11 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 }
 
 fn test_emoji(emoji: &str) -> bool {
-    let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}").unwrap();
+    let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}");
+    let test_reg = match test_reg {
+        Ok(reg) => reg,
+        Err(_) => return false,
+    };
     info!("Testing emoji: {}", emoji);
     test_reg.is_match(emoji)
 }
