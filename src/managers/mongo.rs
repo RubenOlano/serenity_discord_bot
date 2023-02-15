@@ -112,15 +112,16 @@ impl Mongo {
             let res: Option<Document> = db
                 .collection("copers")
                 .find_one_and_update(
-                    doc! { "id": coper_id },
+                    doc! { "id": &coper_id },
                     doc! { "$inc": { "score": 1 } },
                     FindOneAndUpdateOptions::builder().upsert(true).build(),
                 )
                 .await?;
 
-            match res {
-                Some(_) => info!("Updated coper"),
-                None => info!("Added coper"),
+            if let Some(res) = res {
+                info!("Update coper {:#?}", res)
+            } else {
+                info!("Coper with id: {coper_id} was not found in the database")
             }
         } else {
             let new_coper = Coper {
@@ -131,7 +132,11 @@ impl Mongo {
                 .collection("copers")
                 .insert_one(new_coper.clone(), None)
                 .await?;
-            let res_id = res.inserted_id.as_object_id().unwrap().to_string();
+            let res_id = res
+                .inserted_id
+                .as_object_id()
+                .ok_or(eyre::eyre!("Unable to get id"))?
+                .to_string();
             cache.insert(res_id, new_coper);
         }
 
