@@ -40,7 +40,7 @@ impl EventHandler for Bot {
             Vec::new()
         });
 
-        info!("Commands: registered{:#?}", commands)
+        info!("Commands: registered{:#?}", commands);
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -63,7 +63,7 @@ impl EventHandler for Bot {
                         })
                         .await;
                     if let Err(why) = res {
-                        warn!("Cannot respond to command: {:?}", why)
+                        warn!("Cannot respond to command: {:?}", why);
                     }
                 }
                 Err(why) => {
@@ -78,7 +78,7 @@ impl EventHandler for Bot {
                         })
                         .await
                     {
-                        warn!("Cannot respond to command: {:?}", why)
+                        warn!("Cannot respond to command: {:?}", why);
                     }
                 }
             }

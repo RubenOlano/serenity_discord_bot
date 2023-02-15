@@ -65,7 +65,9 @@ pub fn register(cmd: &mut CreateApplicationCommand) -> &mut CreateApplicationCom
 
 pub async fn run(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Result<String> {
     info!("Running circle command");
-    let subcommand = options.get(0).expect("No options provided");
+    let subcommand = options
+        .get(0)
+        .ok_or(eyre::eyre!("No subcommand provided"))?;
 
     let sub_cmd_name = subcommand.name.as_str();
 
@@ -80,7 +82,7 @@ pub async fn run(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Result<String> {
     let name = options
         .get(0)
-        .expect("No options provided")
+        .ok_or(eyre::eyre!("No options provided"))?
         .resolved
         .as_ref()
         .context("No name provided")?;
