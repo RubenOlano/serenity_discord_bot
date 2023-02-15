@@ -1,0 +1,10 @@
+/target
+data/
+dist/
+bot_config.json
+
+acm-core.json
+.idea/
+.vscode/
+.DS_Store
+.env
