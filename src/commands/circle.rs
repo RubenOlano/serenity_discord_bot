@@ -1,12 +1,12 @@
 use eyre::ContextCompat;
-use mongodb::bson::{doc, DateTime};
+use mongodb::bson::{doc, DateTime, Document};
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::channel::PermissionOverwriteType;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
-use serenity::model::prelude::{GuildId, PermissionOverwrite};
+use serenity::model::prelude::{ChannelId, GuildId, PermissionOverwrite, Role, RoleId};
 use serenity::model::Permissions;
 
 use color_eyre::Result;
@@ -80,6 +80,25 @@ pub async fn run(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 }
 
 pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Result<String> {
+    add_role_to_owner(options, ctx, bot).await?;
+
+    let role = create_role(options, ctx, bot).await?;
+    let channel = create_channel(options, ctx, bot, role.id).await?;
+
+    let circle_data = parse_circle_add_options(options, channel)?;
+    bot.mongo_manager.circle_add(ctx, circle_data).await?;
+
+    Ok("Circle added".to_string())
+}
+
+fn test_emoji(emoji: &str) -> bool {
+    let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}");
+    let Ok(test_reg) = test_reg else { return false};
+    info!("Testing emoji: {}", emoji);
+    test_reg.is_match(emoji)
+}
+
+fn parse_circle_add_options(options: &[CommandDataOption], channel: ChannelId) -> Result<Document> {
     let name = options
         .get(0)
         .ok_or(eyre::eyre!("No options provided"))?
@@ -102,18 +121,6 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     let description = match description {
         CommandDataOptionValue::String(description) => description,
         _ => Err(eyre::eyre!("No description provided"))?,
-    };
-
-    let color = options
-        .get(2)
-        .ok_or(eyre::eyre!("No options provided"))?
-        .resolved
-        .as_ref()
-        .context("No color provided")?;
-
-    let color = match color {
-        CommandDataOptionValue::String(color) => color,
-        _ => Err(eyre::eyre!("No color provided"))?,
     };
 
     let emoji = options
@@ -155,6 +162,46 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     if !test_emoji(emoji) {
         return Err(eyre::eyre!("Invalid emoji"));
     }
+
+    let circle = doc! {
+        "name": name.to_string(),
+        "description": description.to_string(),
+        "emoji": emoji.to_string(),
+        "imageUrl": graphic.to_string(),
+        "owner": owner.to_string(),
+        "channel": channel.to_string(),
+        "createdOn": DateTime::now(),
+        "subChannels": Vec::<String>::new(),
+    };
+
+    Ok(circle)
+}
+
+async fn create_role(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Result<Role> {
+    let name = options
+        .get(0)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No name provided")?;
+
+    let name = match name {
+        CommandDataOptionValue::String(name) => name,
+        _ => Err(eyre::eyre!("No name provided"))?,
+    };
+
+    let color = options
+        .get(1)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No color provided")?;
+
+    let color = match color {
+        CommandDataOptionValue::String(color) => color,
+        _ => Err(eyre::eyre!("No color provided"))?,
+    };
+
     let color_int = color
         .parse::<u64>()
         .map_err(|_| eyre::eyre!("Invalid color"))?;
@@ -162,14 +209,78 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     let guild_id = GuildId(bot.settings.guild);
     let res = guild_id
         .create_role(&ctx.http, |r| {
-            r.name(format!("{emoji} {name}"))
-                .colour(color_int)
-                .mentionable(true)
+            r.name(name).colour(color_int).mentionable(true)
         })
         .await?;
 
+    Ok(res)
+}
+
+async fn add_role_to_owner(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Result<()> {
+    let owner = options
+        .get(5)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No owner provided")?;
+
+    let owner = match owner {
+        CommandDataOptionValue::User(owner, _member) => owner,
+        _ => Err(eyre::eyre!("No owner provided"))?,
+    };
+
+    let guild_id = GuildId(bot.settings.guild);
+    let res = create_role(options, ctx, bot).await?;
+
     let mut member = guild_id.member(&ctx.http, owner.id).await?;
     member.add_role(&ctx.http, res.id).await?;
+
+    Ok(())
+}
+
+async fn create_channel(
+    options: &[CommandDataOption],
+    ctx: &Context,
+    bot: &Bot,
+    role: RoleId,
+) -> Result<ChannelId> {
+    let name = options
+        .get(0)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No name provided")?;
+
+    let name = match name {
+        CommandDataOptionValue::String(name) => name,
+        _ => Err(eyre::eyre!("No name provided"))?,
+    };
+
+    let description = options
+        .get(1)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No description provided")?;
+
+    let description = match description {
+        CommandDataOptionValue::String(description) => description,
+        _ => Err(eyre::eyre!("No description provided"))?,
+    };
+
+    let emoji = options
+        .get(3)
+        .ok_or(eyre::eyre!("No options provided"))?
+        .resolved
+        .as_ref()
+        .context("No emoji provided")?;
+
+    let emoji = match emoji {
+        CommandDataOptionValue::String(emoji) => emoji,
+        _ => Err(eyre::eyre!("No emoji provided"))?,
+    };
+
+    let guild_id = GuildId(bot.settings.guild);
 
     let everyone = guild_id.roles(&ctx.http).await?;
     let everyone = everyone
@@ -187,7 +298,7 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
                     PermissionOverwrite {
                         allow: Permissions::VIEW_CHANNEL,
                         deny: Permissions::empty(),
-                        kind: PermissionOverwriteType::Role(res.id),
+                        kind: PermissionOverwriteType::Role(role),
                     },
                     PermissionOverwrite {
                         allow: Permissions::empty(),
@@ -198,25 +309,5 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
         })
         .await?;
 
-    let circle = doc! {
-        "name": name,
-        "description": description,
-        "emoji": emoji,
-        "imageUrl": graphic,
-        "owner": owner.id.to_string(),
-        "createdOn": DateTime::now(),
-        "channel": res.id.to_string(),
-        "subChannels": [],
-    };
-
-    bot.mongo_manager.circle_add(ctx, circle).await?;
-
-    Ok("Circle added".to_string())
-}
-
-fn test_emoji(emoji: &str) -> bool {
-    let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}");
-    let Ok(test_reg) = test_reg else { return false};
-    info!("Testing emoji: {}", emoji);
-    test_reg.is_match(emoji)
+    Ok(res.id)
 }

@@ -179,13 +179,14 @@ impl Mongo {
         let res: Document = db
             .collection("circle")
             .find_one_and_update(doc! { "id": circle_id }, new_data, None)
-            .await
-            .expect("Unable to find circle")
-            .ok_or_else(|| eyre::eyre!("Unable to find circle"))?;
+            .await?
+            .ok_or(eyre::eyre!("Unable to find circle"))?;
 
-        let res_id = res.get_object_id("_id").unwrap().to_string();
+        let res_id = res.get_object_id("_id")?.to_string();
         let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<Circle>().unwrap();
+        let cache = data
+            .get_mut::<Circle>()
+            .ok_or(eyre::eyre!("Unable to get cache"))?;
         cache.insert(res_id, bson::from_document::<Circle>(res)?);
 
         Ok(())
