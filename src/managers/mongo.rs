@@ -56,7 +56,7 @@ impl Mongo {
             .await?
             .ok_or(eyre::eyre!("Unable to find response"))?;
 
-        let res_id = res.get_object_id("_id").unwrap().to_string();
+        let res_id = res.get_object_id("_id")?.to_string();
 
         let mut data = ctx.data.write().await;
         let cache = data
@@ -76,26 +76,23 @@ impl Mongo {
                 doc! { "$inc": { "count": 1 } },
                 None,
             )
-            .await
-            .expect("Unable to update coper")
-            .ok_or_else(|| eyre::eyre!("Unable to find coper"))?;
+            .await?
+            .ok_or(eyre::eyre!("Unable to find coper"))?;
 
         let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<Coper>().unwrap();
-        match cache.get_mut(coper_id) {
-            Some(coper) => {
-                coper.score += 1;
-            }
-            None => {
-                let coper: Document = db
-                    .collection("copers")
-                    .find_one(doc! { "id": coper_id }, None)
-                    .await
-                    .expect("Unable to find coper")
-                    .ok_or_else(|| eyre::eyre!("Unable to find coper"))?;
-                let coper = bson::from_document::<Coper>(coper)?;
-                cache.insert(coper.id.clone(), coper);
-            }
+        let cache = data
+            .get_mut::<Coper>()
+            .ok_or(eyre::eyre!("Unable to get cache"))?;
+        if let Some(coper) = cache.get_mut(coper_id) {
+            coper.score += 1;
+        } else {
+            let coper: Document = db
+                .collection("copers")
+                .find_one(doc! { "id": coper_id }, None)
+                .await?
+                .ok_or(eyre::eyre!("Unable to find coper"))?;
+            let coper = bson::from_document::<Coper>(coper)?;
+            cache.insert(coper.id.clone(), coper);
         }
 
         Ok(())
@@ -104,11 +101,7 @@ impl Mongo {
         let new_coper = bson::from_document::<Coper>(coper.clone())?;
 
         let db = self.client.database("discord");
-        let res = db
-            .collection("copers")
-            .insert_one(new_coper, None)
-            .await
-            .expect("Unable to insert coper");
+        let res = db.collection("copers").insert_one(new_coper, None).await?;
 
         let res_id = res.inserted_id.as_object_id().unwrap().to_string();
         let mut data = ctx.data.write().await;
@@ -122,13 +115,14 @@ impl Mongo {
         let res: Document = db
             .collection("copers")
             .find_one_and_update(doc! { "id": id }, new_data, None)
-            .await
-            .expect("Unable to find coper")
-            .ok_or_else(|| eyre::eyre!("Unable to find coper"))?;
+            .await?
+            .ok_or(eyre::eyre!("Unable to find coper"))?;
 
         let res_id = res.get_object_id("_id").unwrap().to_string();
         let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<Coper>().unwrap();
+        let cache = data
+            .get_mut::<Coper>()
+            .ok_or(eyre::eyre!("Unable to get cache"))?;
         cache.insert(res_id, bson::from_document::<Coper>(res)?);
         Ok(())
     }
@@ -138,10 +132,13 @@ impl Mongo {
         let res = db
             .collection("circle")
             .insert_one(circle_data.clone(), None)
-            .await
-            .expect("Unable to insert circle");
+            .await?;
 
-        let res_id = res.inserted_id.as_object_id().unwrap().to_string();
+        let res_id = res
+            .inserted_id
+            .as_object_id()
+            .ok_or(eyre::eyre!("Unable to get the new id"))?
+            .to_string();
 
         let mut circle_data = circle_data.clone();
         circle_data.insert("_id", res_id.clone());

@@ -216,10 +216,7 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 
 fn test_emoji(emoji: &str) -> bool {
     let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}");
-    let test_reg = match test_reg {
-        Ok(reg) => reg,
-        Err(_) => return false,
-    };
+    let Ok(test_reg) = test_reg else { return false};
     info!("Testing emoji: {}", emoji);
     test_reg.is_match(emoji)
 }
