@@ -3,6 +3,7 @@ use std::fmt::Display;
 use color_eyre::Result;
 use mongodb::{
     bson::{self, doc, Document},
+    options::FindOneAndUpdateOptions,
     Client,
 };
 use serenity::prelude::Context;
@@ -25,6 +26,14 @@ impl Mongo {
         Self { client }
     }
 
+    /// Add a response into the database
+    /// # Arguments
+    /// * `ctx` - The context of the command
+    /// * `tipe` - The type of the response
+    /// * `msg` - The message of the response
+    /// # Errors
+    /// * If the database is unable to insert the response
+    /// * If the cache is unable to insert the response
     pub async fn response_add(&self, ctx: Context, tipe: ResponseType, msg: &str) -> Result<()> {
         let db = self.client.database("discord");
         let new_doc = doc! {
@@ -48,6 +57,14 @@ impl Mongo {
         Ok(())
     }
 
+    /// Delete a response from the database
+    /// # Arguments
+    /// * `ctx` - The context of the command
+    /// * `msg` - The message of the response
+    /// # Errors
+    /// * If the database is unable to delete the response
+    /// * If the cache is unable to delete the response
+    /// * If the response is not found
     pub async fn response_delete(&self, ctx: Context, msg: &str) -> Result<()> {
         let db = self.client.database("discord");
         let res: Document = db
@@ -67,32 +84,55 @@ impl Mongo {
         Ok(())
     }
 
+    /// Either add or update a `coper` in the database
+    /// # Arguments
+    /// * `ctx` - The context of the command
+    /// * `coper` - The coper to add or update
+    /// # Errors
+    /// * If the database is unable to add or update the coper
+    /// * If the cache is unable to add or update the coper
+    /// * If the coper is not found (in cache or database)
     pub async fn coper_increment(&self, ctx: Context, coper_id: &str) -> Result<()> {
         let db = self.client.database("discord");
-        let _: Document = db
+        let coper_doc: Option<Document> = db
             .collection("copers")
-            .find_one_and_update(
-                doc! { "id": coper_id },
-                doc! { "$inc": { "count": 1 } },
-                None,
-            )
-            .await?
-            .ok_or(eyre::eyre!("Unable to find coper"))?;
+            .find_one(doc! { "id": coper_id }, None)
+            .await?;
 
         let mut data = ctx.data.write().await;
         let cache = data
             .get_mut::<Coper>()
             .ok_or(eyre::eyre!("Unable to get cache"))?;
-        if let Some(coper) = cache.get_mut(coper_id) {
-            coper.score += 1;
-        } else {
-            let coper: Document = db
-                .collection("copers")
-                .find_one(doc! { "id": coper_id }, None)
-                .await?
+        if let Some(coper_doc) = coper_doc {
+            let coper_id = coper_doc.get_object_id("_id")?.to_string();
+            let entry = cache
+                .get_mut(&coper_id)
                 .ok_or(eyre::eyre!("Unable to find coper"))?;
-            let coper = bson::from_document::<Coper>(coper)?;
-            cache.insert(coper.id.clone(), coper);
+            entry.score += 1;
+            let res: Option<Document> = db
+                .collection("copers")
+                .find_one_and_update(
+                    doc! { "id": coper_id },
+                    doc! { "$inc": { "score": 1 } },
+                    FindOneAndUpdateOptions::builder().upsert(true).build(),
+                )
+                .await?;
+
+            match res {
+                Some(_) => info!("Updated coper"),
+                None => info!("Added coper"),
+            }
+        } else {
+            let new_coper = Coper {
+                id: coper_id.to_string(),
+                score: 1,
+            };
+            let res = db
+                .collection("copers")
+                .insert_one(new_coper.clone(), None)
+                .await?;
+            let res_id = res.inserted_id.as_object_id().unwrap().to_string();
+            cache.insert(res_id, new_coper);
         }
 
         Ok(())
