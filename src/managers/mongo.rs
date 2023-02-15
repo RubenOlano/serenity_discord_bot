@@ -208,12 +208,12 @@ pub enum ResponseType {
 impl Display for ResponseType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResponseType::Error => write!(f, "error"),
-            ResponseType::Basic => write!(f, "basic"),
-            ResponseType::Cors => write!(f, "cors"),
-            ResponseType::Default => write!(f, "default"),
-            ResponseType::Opaque => write!(f, "opaque"),
-            ResponseType::OpaqueDirect => write!(f, "opaquedirect"),
+            Self::Error => write!(f, "error"),
+            Self::Basic => write!(f, "basic"),
+            Self::Cors => write!(f, "cors"),
+            Self::Default => write!(f, "default"),
+            Self::Opaque => write!(f, "opaque"),
+            Self::OpaqueDirect => write!(f, "opaquedirect"),
         }
     }
 }

@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_derive::Serialize;
 use serenity::prelude::TypeMapKey;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Circle {
     #[serde(rename = "_id")]
@@ -22,5 +22,5 @@ pub struct Circle {
 }
 
 impl TypeMapKey for Circle {
-    type Value = HashMap<String, Circle>;
+    type Value = HashMap<String, Self>;
 }

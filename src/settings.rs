@@ -28,7 +28,7 @@ pub struct Settings {
     pub roles: Roles,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Activity {
     #[serde(rename = "type")]
@@ -36,26 +36,26 @@ pub struct Activity {
     pub description: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Firestore {
     pub project_id: String,
     pub key_filename: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Express {
     pub port: i64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Keys {
     pub sheets: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Points {
     pub private_channel: String,
@@ -74,7 +74,7 @@ pub struct Circles {
     pub remind_threshold_days: f64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Channels {
     pub verification: String,
@@ -85,7 +85,7 @@ pub struct Channels {
     pub mod_field: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Roles {
     pub member: String,
@@ -95,7 +95,7 @@ pub struct Roles {
     pub divisions: Divisions,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Divisions {
     pub projects: String,
@@ -106,8 +106,7 @@ pub struct Divisions {
 impl Settings {
     pub fn new() -> Self {
         let json_file = File::open("bot_config.json").expect("Failed to open settings.json");
-        let settings: Settings =
-            serde_json::from_reader(json_file).expect("Failed to parse settings.json");
-        settings
+
+        serde_json::from_reader(json_file).expect("Failed to parse settings.json")
     }
 }

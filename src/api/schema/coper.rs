@@ -4,7 +4,7 @@ use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use serenity::prelude::TypeMapKey;
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Coper {
     #[serde(rename = "_id")]
@@ -13,5 +13,5 @@ pub struct Coper {
 }
 
 impl TypeMapKey for Coper {
-    type Value = HashMap<String, Coper>;
+    type Value = HashMap<String, Self>;
 }

@@ -15,11 +15,11 @@ pub enum ResponsesType {
 impl Display for ResponsesType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResponsesType::Strike => write!(f, "strike"),
-            ResponsesType::Kick => write!(f, "kick"),
-            ResponsesType::Ban => write!(f, "ban"),
-            ResponsesType::Mute => write!(f, "mute"),
-            ResponsesType::Caretaker => write!(f, "caretaker"),
+            Self::Strike => write!(f, "strike"),
+            Self::Kick => write!(f, "kick"),
+            Self::Ban => write!(f, "ban"),
+            Self::Mute => write!(f, "mute"),
+            Self::Caretaker => write!(f, "caretaker"),
         }
     }
 }
@@ -33,5 +33,5 @@ pub struct Response {
 }
 
 impl TypeMapKey for Response {
-    type Value = HashMap<String, Response>;
+    type Value = HashMap<String, Self>;
 }
