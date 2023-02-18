@@ -3,7 +3,6 @@ use std::fmt::Display;
 use color_eyre::Result;
 use mongodb::{
     bson::{self, doc, Document},
-    options::FindOneAndUpdateOptions,
     Client,
 };
 use serenity::prelude::Context;
@@ -99,63 +98,61 @@ impl Mongo {
             .find_one(doc! { "id": coper_id }, None)
             .await?;
 
-        let mut data = ctx.data.write().await;
-        let cache = data
-            .get_mut::<Coper>()
-            .ok_or(eyre::eyre!("Unable to get cache"))?;
         if let Some(coper_doc) = coper_doc {
-            let coper_id = coper_doc.get_object_id("_id")?.to_string();
-            let entry = cache
-                .get_mut(&coper_id)
-                .ok_or(eyre::eyre!("Unable to find coper"))?;
-            entry.score += 1;
-            let res: Option<Document> = db
-                .collection("copers")
-                .find_one_and_update(
-                    doc! { "id": &coper_id },
-                    doc! { "$inc": { "score": 1 } },
-                    FindOneAndUpdateOptions::builder().upsert(true).build(),
-                )
-                .await?;
-
-            if let Some(res) = res {
-                info!("Update coper {:#?}", res)
-            } else {
-                info!("Coper with id: {coper_id} was not found in the database")
-            }
+            let coper = bson::from_document::<Coper>(coper_doc.clone())?;
+            let new_coper = Coper {
+                id: coper.id.clone(),
+                score: coper.score + 1,
+            };
+            self.coper_update(
+                &ctx,
+                &coper.id,
+                doc! { "$set": { "score": new_coper.score } },
+            )
+            .await?;
         } else {
             let new_coper = Coper {
                 id: coper_id.to_string(),
                 score: 1,
             };
-            let res = db
-                .collection("copers")
-                .insert_one(new_coper.clone(), None)
-                .await?;
-            let res_id = res
-                .inserted_id
-                .as_object_id()
-                .ok_or(eyre::eyre!("Unable to get id"))?
-                .to_string();
-            cache.insert(res_id, new_coper);
+            self.coper_add(&ctx, bson::to_document(&new_coper)?).await?;
         }
 
         Ok(())
     }
-    pub async fn coper_add(&self, ctx: Context, coper: Document) -> Result<()> {
+
+    /// Add a coper into the database
+    /// # Arguments
+    /// * `ctx` - The context of the command
+    /// * `coper` - The coper to add
+    /// # Errors
+    /// * If the database is unable to add the coper
+    /// * If the cache is unable to add the coper
+    async fn coper_add(&self, ctx: &Context, coper: Document) -> Result<String> {
         let new_coper = bson::from_document::<Coper>(coper.clone())?;
 
         let db = self.client.database("discord");
         let res = db.collection("copers").insert_one(new_coper, None).await?;
 
-        let res_id = res.inserted_id.as_object_id().unwrap().to_string();
+        let res_id = res
+            .inserted_id
+            .as_object_id()
+            .ok_or(eyre::eyre!("Unable to get id"))?
+            .to_string();
         let mut data = ctx.data.write().await;
         let cache = data.get_mut::<Coper>().unwrap();
-        cache.insert(res_id, bson::from_document::<Coper>(coper)?);
-        Ok(())
+        cache.insert(res_id.clone(), bson::from_document::<Coper>(coper)?);
+        Ok(res_id)
     }
 
-    pub async fn coper_update(&self, ctx: Context, id: &str, new_data: Document) -> Result<()> {
+    /// Update a coper in the database
+    /// # Arguments
+    /// * `ctx` - The context of the command
+    /// * `id` - The id of the coper to update
+    /// * `new_data` - The new data to update the coper with
+    /// # Errors
+    /// * If the database is unable to update the coper
+    async fn coper_update(&self, ctx: &Context, id: &str, new_data: Document) -> Result<String> {
         let db = self.client.database("discord");
         let res: Document = db
             .collection("copers")
@@ -168,25 +165,15 @@ impl Mongo {
         let cache = data
             .get_mut::<Coper>()
             .ok_or(eyre::eyre!("Unable to get cache"))?;
-        cache.insert(res_id, bson::from_document::<Coper>(res)?);
-        Ok(())
+        cache.insert(res_id.clone(), bson::from_document::<Coper>(res)?);
+        Ok(res_id)
     }
 
     pub async fn circle_add(&self, ctx: &Context, circle_data: Document) -> Result<()> {
         let db = self.client.database("discord");
-        let res = db
-            .collection("circle")
+        db.collection("circle")
             .insert_one(circle_data.clone(), None)
             .await?;
-
-        let res_id = res
-            .inserted_id
-            .as_object_id()
-            .ok_or(eyre::eyre!("Unable to get the new id"))?
-            .to_string();
-
-        let mut circle_data = circle_data.clone();
-        circle_data.insert("_id", res_id.clone());
 
         let new_circle = bson::from_document::<Circle>(circle_data)?;
 
@@ -194,7 +181,7 @@ impl Mongo {
         let cache = data
             .get_mut::<Circle>()
             .ok_or(eyre::eyre!("Unable to get cache"))?;
-        cache.insert(res_id, new_circle);
+        cache.insert(new_circle.id.clone(), new_circle);
         info!("Added circle to cache");
         Ok(())
     }

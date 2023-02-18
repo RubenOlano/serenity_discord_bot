@@ -67,9 +67,9 @@ pub struct Points {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Circles {
-    pub join_channel: String,
+    pub join_channel: u64,
     pub parent_category: u64,
-    pub leader_channel: String,
+    pub leader_channel: u64,
     pub remind_cron: String,
     pub remind_threshold_days: f64,
 }
