@@ -10,6 +10,7 @@ use color_eyre::Report;
 use serenity::{
     async_trait,
     model::prelude::{
+        component::ComponentType,
         interaction::{Interaction, InteractionResponseType},
         Activity, GuildId, Ready,
     },
@@ -122,6 +123,30 @@ impl EventHandler for Bot {
                         .await
                     {
                         warn!("Cannot respond to command: {:?}", why);
+                    }
+                }
+            }
+        } else if let Interaction::MessageComponent(msg) = interaction {
+            if msg.data.component_type != ComponentType::Button {
+                return;
+            }
+            if msg.data.custom_id.starts_with("circle") {
+                let res = self.circle_manager.handle_button(&ctx, &msg).await;
+                match res {
+                    Ok(res) => {
+                        let res = msg
+                            .create_interaction_response(&ctx.http, |r| {
+                                r.kind(InteractionResponseType::UpdateMessage)
+                                    .interaction_response_data(|d| d.content(res))
+                            })
+                            .await;
+                        if let Err(why) = res {
+                            warn!("Cannot respond to command button: {:?}", why);
+                        }
+                        return;
+                    }
+                    Err(why) => {
+                        warn!("Cannot respond to command button: {:?}", why);
                     }
                 }
             }

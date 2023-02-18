@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 
 use color_eyre::Result;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serenity::{
     builder::{CreateActionRow, CreateButton, CreateEmbed},
-    model::prelude::{component::ButtonStyle, Channel, ChannelId, GuildId, ReactionType},
+    model::prelude::{
+        component::ButtonStyle, interaction::message_component::MessageComponentInteraction,
+        Channel, ChannelId, GuildId, ReactionType, RoleId,
+    },
     prelude::Context,
 };
+use tracing::{info, instrument};
 use urlencoding::encode;
 
 use crate::{api::schema::circle::Circle, settings::Settings};
@@ -19,7 +24,8 @@ pub struct CircleManager {
 }
 
 impl CircleManager {
-    #[must_use] pub fn new(settings: &Settings) -> Self {
+    #[must_use]
+    pub fn new(settings: &Settings) -> Self {
         Self {
             join_channel: ChannelId(settings.circles.join_channel),
             leader_channel: ChannelId(settings.circles.leader_channel),
@@ -129,14 +135,16 @@ impl CircleManager {
                 .field("**Members**", member_count, true)
                 .footer(|f| f.text(footer_text))
                 .description(format!("{} {}", encoded_data.encode()?, c.description))
-                .thumbnail(c.image_url).clone(),
+                .thumbnail(c.image_url)
+                .clone(),
             false => CreateEmbed::default()
                 .title(format!("{} {} {} ", c.emoji, c.name, c.emoji))
                 .color(role.colour)
                 .field("**Role**", format!("<@&{}>", c.id), true)
                 .field("**Members**", member_count, true)
                 .footer(|f| f.text(footer_text))
-                .description(format!("{} {}", encoded_data.encode()?, c.description)).clone(),
+                .description(format!("{} {}", encoded_data.encode()?, c.description))
+                .clone(),
         };
 
         let emoji: ReactionType = c.emoji.clone().try_into()?;
@@ -145,16 +153,19 @@ impl CircleManager {
             .label(format!("Join/Leave {}", c.name))
             .custom_id(format!("circle/join/{}", c.id))
             .emoji(emoji)
-            .style(ButtonStyle::Primary).clone();
+            .style(ButtonStyle::Primary)
+            .clone();
 
         let about_button = CreateButton::default()
             .label("Learn More")
             .custom_id(format!("circle/about/{}", c.id))
             .style(ButtonStyle::Secondary)
-            .disabled(true).clone();
+            .disabled(true)
+            .clone();
         let action_row = CreateActionRow::default()
             .add_button(join_button)
-            .add_button(about_button).clone();
+            .add_button(about_button)
+            .clone();
 
         Ok((embed, action_row))
     }
@@ -175,6 +186,91 @@ impl CircleManager {
         }
 
         Ok(count)
+    }
+
+    pub async fn handle_button(
+        &self,
+        ctx: &Context,
+        int: &MessageComponentInteraction,
+    ) -> Result<String> {
+        let data = int.data.custom_id.clone();
+        let reg = Regex::new(r"circle/([^/]*)/([^/]+)")?;
+        let matches = reg
+            .captures(&data)
+            .ok_or(eyre::eyre!("Unable to get matches"))?;
+        let action = matches
+            .get(1)
+            .ok_or(eyre::eyre!("Unable to get action"))?
+            .as_str();
+        let circle_id = matches
+            .get(2)
+            .ok_or(eyre::eyre!("Unable to get circle id"))?
+            .as_str();
+
+        info!("Action: {} Circle: {}", action, circle_id);
+
+        let circle = self.get_circle(ctx, circle_id).await?;
+
+        let res = match action {
+            "join" => self.handle_join(ctx, &circle, &int).await?,
+            _ => "Unable to get action".to_owned(),
+        };
+
+        Ok(res)
+    }
+
+    #[instrument(skip(self, ctx), fields(circle_id = %circle_id))]
+    async fn get_circle(&self, ctx: &Context, circle_id: &str) -> Result<Circle> {
+        let data = ctx.data.read().await;
+        let circles = data
+            .get::<Circle>()
+            .ok_or(eyre::eyre!("Unable to get circles"))?;
+
+        let circle = circles
+            .get(circle_id)
+            .ok_or(eyre::eyre!("Unable to get circle"))?;
+        Ok(circle.to_owned())
+    }
+
+    #[instrument(skip(self, ctx, c, int), fields(circle_id = %c.id))]
+    async fn handle_join(
+        &self,
+        ctx: &Context,
+        c: &Circle,
+        int: &MessageComponentInteraction,
+    ) -> Result<String> {
+        let mut member = self.guild_id.member(&ctx.http, int.user.id).await?;
+
+        let channel = ctx
+            .http
+            .get_channel(c.channel.parse::<u64>()?.into())
+            .await?;
+
+        let role_id: RoleId = c.id.parse::<u64>()?.into();
+        if member.roles.contains(&role_id) {
+            member.remove_role(&ctx.http, role_id).await?;
+            let res = format!(
+                "You have left the {} circle. Thank you for using circles",
+                c.name
+            );
+            Ok(res)
+        } else {
+            member.add_role(&ctx.http, role_id).await?;
+            let res = format!(
+                "You have joined the {} circle. Thank you for using circles",
+                c.name
+            );
+            channel
+                .id()
+                .send_message(&ctx.http, |m| {
+                    m.content(format!(
+                        "Welcome to the {} circle <@{}>!",
+                        c.name, int.user.id
+                    ))
+                })
+                .await?;
+            Ok(res)
+        }
     }
 }
 
