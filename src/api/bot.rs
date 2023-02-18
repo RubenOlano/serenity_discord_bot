@@ -47,17 +47,22 @@ impl EventHandler for Bot {
 
         info!("Commands: registered{:#?}", commands);
 
-        let mut cursor = self
+        let Ok(mut cursor) =  self
             .mongo_manager
             .client
             .database("discord")
             .collection::<Circle>("circle")
             .find(None, None)
-            .await
-            .unwrap();
+            .await else {
+                info!("Unable to get circles from database");
+                return;
+            };
 
         let mut data = ctx.data.write().await;
-        let c_manager = data.get_mut::<Circle>().unwrap();
+        let Some(c_manager) = data.get_mut::<Circle>() else {
+            info!("Unable to get circle manager");
+            return;
+        };
 
         while cursor.advance().await.unwrap() {
             let doc = cursor.current();

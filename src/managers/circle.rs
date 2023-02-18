@@ -19,11 +19,11 @@ pub struct CircleManager {
 }
 
 impl CircleManager {
-    pub fn new(settings: &Settings) -> Self {
+    #[must_use] pub fn new(settings: &Settings) -> Self {
         Self {
             join_channel: ChannelId(settings.circles.join_channel),
             leader_channel: ChannelId(settings.circles.leader_channel),
-            guild_id: GuildId(settings.guild.into()),
+            guild_id: GuildId(settings.guild),
         }
     }
     pub async fn repost(&self, ctx: &Context) -> Result<()> {
@@ -129,16 +129,14 @@ impl CircleManager {
                 .field("**Members**", member_count, true)
                 .footer(|f| f.text(footer_text))
                 .description(format!("{} {}", encoded_data.encode()?, c.description))
-                .thumbnail(c.image_url)
-                .to_owned(),
+                .thumbnail(c.image_url).clone(),
             false => CreateEmbed::default()
                 .title(format!("{} {} {} ", c.emoji, c.name, c.emoji))
                 .color(role.colour)
                 .field("**Role**", format!("<@&{}>", c.id), true)
                 .field("**Members**", member_count, true)
                 .footer(|f| f.text(footer_text))
-                .description(format!("{} {}", encoded_data.encode()?, c.description))
-                .to_owned(),
+                .description(format!("{} {}", encoded_data.encode()?, c.description)).clone(),
         };
 
         let emoji: ReactionType = c.emoji.clone().try_into()?;
@@ -147,19 +145,16 @@ impl CircleManager {
             .label(format!("Join/Leave {}", c.name))
             .custom_id(format!("circle/join/{}", c.id))
             .emoji(emoji)
-            .style(ButtonStyle::Primary)
-            .to_owned();
+            .style(ButtonStyle::Primary).clone();
 
         let about_button = CreateButton::default()
             .label("Learn More")
             .custom_id(format!("circle/about/{}", c.id))
             .style(ButtonStyle::Secondary)
-            .disabled(true)
-            .to_owned();
+            .disabled(true).clone();
         let action_row = CreateActionRow::default()
             .add_button(join_button)
-            .add_button(about_button)
-            .to_owned();
+            .add_button(about_button).clone();
 
         Ok((embed, action_row))
     }

@@ -187,7 +187,7 @@ async fn create_role(options: &[CommandDataOption], ctx: &Context, bot: &Bot) ->
     let guild_id = GuildId(bot.settings.guild);
     let res = guild_id
         .create_role(&ctx.http, |r| {
-            r.name(format!("{} {}", emoji, name))
+            r.name(format!("{emoji} {name}"))
                 .colour(color_int)
                 .mentionable(true)
         })
