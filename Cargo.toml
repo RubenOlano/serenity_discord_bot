@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.23"
 color-eyre = "0.6.2"
 eyre = "0.6.8"
-firestore = "0.28.0"
-mongodb = "2.3.1"
+firestore = {version="0.29.0"}
 regex = "1.7.1"
 serde = { version = "1.0.152", features = ["derive"] }
 serde_derive = "1.0.152"

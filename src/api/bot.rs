@@ -1,5 +1,7 @@
 use color_eyre::Report;
 use color_eyre::Result;
+use serenity::futures::stream::BoxStream;
+use serenity::futures::StreamExt;
 use serenity::model::application::interaction::message_component::MessageComponentInteraction;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::{
@@ -13,19 +15,14 @@ use serenity::{
 };
 use tracing::{info, warn};
 
-use crate::{
-    api::schema::circle::Circle,
-    commands,
-    managers::{circle::CircleManager, mongo::Mongo},
-};
+use crate::{api::schema::circle::Circle, commands, managers::circle::CircleManager};
 
-// use super::super::managers::firestore::FirestoreManager;
+use super::super::managers::firestore::FSManager;
 use super::super::settings::Settings;
 
 pub struct Bot {
     pub settings: Settings,
-    // pub firestore_manager: FirestoreManager,
-    pub mongo_manager: Mongo,
+    pub firestore_manager: FSManager,
     pub circle_manager: CircleManager,
 }
 
@@ -81,39 +78,29 @@ impl EventHandler for Bot {
 impl Bot {
     pub async fn new() -> Self {
         let settings = Settings::new();
-        // let firestore_manager = FirestoreManager::new().await;
-        let mongo_manager = Mongo::new(&settings).await;
+        let firestore_manager = FSManager::new().await;
         let circle_manager = CircleManager::new(&settings);
         Self {
             settings,
-            // firestore_manager,
-            mongo_manager,
+            firestore_manager,
             circle_manager,
         }
     }
 
     pub async fn recache_ctx(&self, ctx: &Context) -> Result<String> {
-        let Ok(mut cursor) = self
-            .mongo_manager
-            .client
-            .database("discord")
-            .collection::<Circle>("circle")
-            .find(None, None)
-            .await else {
-            warn!("Unable to get circles from database");
-            return Ok("Unable to get circles from database".to_string());
-        };
+        let db = self.firestore_manager.client.fluent();
+        let circles: BoxStream<Circle> = db.select().from("circle").obj().stream_query().await?;
+        let vectors: Vec<Circle> = circles.collect().await;
 
         let mut data = ctx.data.write().await;
-        let Some(c_manager) = data.get_mut::<Circle>() else {
-            warn!("Unable to get circle manager");
-            return Ok("Unable to get circle manager".to_string());
-        };
-
-        let new_circles = super::super::util::fetch_circles(&mut cursor).await?;
-        for (_, circle) in new_circles {
-            c_manager.insert(circle.id.clone(), circle);
+        let circles = data
+            .get_mut::<Circle>()
+            .ok_or(eyre::eyre!("No circle data"))?;
+        info!("Recaching {} circles", vectors.len());
+        for circle in vectors {
+            circles.insert(circle.id.clone(), circle);
         }
+
         Ok("Recached".to_string())
     }
 

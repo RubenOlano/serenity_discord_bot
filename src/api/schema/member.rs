@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use mongodb::bson::DateTime;
+use firestore::FirestoreTimestamp;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use serenity::prelude::TypeMapKey;
@@ -11,7 +11,7 @@ pub struct Member {
     #[serde(rename = "_id")]
     pub id: String,
     pub strikes: i64,
-    pub last_strike: DateTime,
+    pub last_strike: FirestoreTimestamp,
     pub preferences: Preferences,
 }
 

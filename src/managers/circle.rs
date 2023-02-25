@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use serenity::{
     builder::{CreateActionRow, CreateButton, CreateEmbed},
     model::prelude::{
-        Channel, ChannelId,
-        component::ButtonStyle, GuildId, interaction::message_component::MessageComponentInteraction, ReactionType, RoleId,
+        component::ButtonStyle, interaction::message_component::MessageComponentInteraction,
+        Channel, ChannelId, GuildId, ReactionType, RoleId,
     },
     prelude::Context,
 };
@@ -124,7 +124,11 @@ impl CircleManager {
             .find(|r| r.name == format!("{} {}", c.emoji, c.name))
             .ok_or(eyre::eyre!("Unable to get role"))?;
 
-        let footer_text = format!("Created on {}﹒👑 Owner: {}", c.created_on, owner.name);
+        let footer_text = format!(
+            "Created on {}﹒👑 Owner: {}",
+            c.created_on.format("%B %d, %Y"),
+            owner.name
+        );
 
         circle_reaction.insert(c.emoji.clone(), c.id.clone());
         let encoded_data = EncodeData {

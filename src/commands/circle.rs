@@ -1,5 +1,5 @@
+use chrono::Utc;
 use color_eyre::Result;
-use mongodb::bson::{doc, DateTime, Document};
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::channel::PermissionOverwriteType;
 use serenity::model::prelude::command::CommandOptionType;
@@ -12,6 +12,7 @@ use serenity::prelude::Context;
 use tracing::info;
 
 use crate::api::bot::Bot;
+use crate::api::schema::circle::Circle;
 
 pub fn register(cmd: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     cmd.create_option(|option| {
@@ -96,7 +97,7 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     let channel = create_channel(options, ctx, bot, role.id).await?;
 
     let circle_data = parse_circle_add_options(options, channel, role.id)?;
-    bot.mongo_manager.circle_add(ctx, circle_data).await?;
+    bot.firestore_manager.circle_add(ctx, circle_data).await?;
 
     Ok("Circle added".to_string())
 }
@@ -112,7 +113,7 @@ fn parse_circle_add_options(
     options: &[CommandDataOption],
     channel: ChannelId,
     role: RoleId,
-) -> Result<Document> {
+) -> Result<Circle> {
     let name = parse_option(options, "name")?;
     let name = match name {
         CommandDataOptionValue::String(name) => name,
@@ -147,16 +148,16 @@ fn parse_circle_add_options(
         return Err(eyre::eyre!("Invalid emoji"));
     }
 
-    let circle = doc! {
-        "name": name.to_string(),
-        "description": description.to_string(),
-        "emoji": emoji.to_string(),
-        "imageUrl": graphic.to_string(),
-        "owner": owner.id.to_string(),
-        "channel": channel.to_string(),
-        "createdOn": DateTime::now(),
-        "subChannels": Vec::<String>::new(),
-        "_id": role.to_string(),
+    let circle = Circle {
+        name: name.to_string(),
+        description: description.to_string(),
+        emoji: emoji.to_string(),
+        image_url: graphic.to_string(),
+        owner: owner.id.to_string(),
+        channel: channel.to_string(),
+        created_on: Utc::now(),
+        sub_channels: Vec::<String>::new(),
+        id: role.to_string(),
     };
 
     Ok(circle)

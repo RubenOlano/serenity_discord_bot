@@ -1,7 +1,6 @@
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-use mongodb::bson::DateTime;
-use mongodb::bson::doc;
 use serde::Deserialize;
 use serde_derive::Serialize;
 use serenity::prelude::TypeMapKey;
@@ -15,7 +14,8 @@ pub struct Circle {
     pub description: String,
     pub image_url: String,
     pub emoji: String,
-    pub created_on: DateTime,
+    #[serde(with = "firestore::serialize_as_timestamp")]
+    pub created_on: DateTime<Utc>,
     pub channel: String,
     pub owner: String,
     pub sub_channels: Vec<String>,
