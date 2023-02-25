@@ -2,6 +2,7 @@ use std::fs::File;
 
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
+use tracing::debug;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +106,7 @@ pub struct Divisions {
 
 impl Settings {
     pub fn new() -> Self {
+        debug!("Loading settings.json...");
         let json_file = File::open("bot_config.json").expect("Failed to open settings.json");
 
         serde_json::from_reader(json_file).expect("Failed to parse settings.json")

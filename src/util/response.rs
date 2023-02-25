@@ -1,8 +1,6 @@
-use std::default;
-
 use serenity::{
     builder::CreateEmbed,
-    model::prelude::{Channel, Embed, GuildChannel},
+    model::prelude::{ Embed, GuildChannel},
     utils::Color,
 };
 
@@ -26,6 +24,7 @@ pub enum ResponseFormat {
     Simple(ResponseType),
     Embed(ResponseType),
 }
+
 pub struct ResponseUtil {
     pub format: ResponseFormat,
 }

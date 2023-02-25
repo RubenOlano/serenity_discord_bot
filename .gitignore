@@ -8,3 +8,4 @@ acm-core.json
 .vscode/
 .DS_Store
 .env
+/logs/acm-bot.log

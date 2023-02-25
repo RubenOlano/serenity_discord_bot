@@ -1,3 +1,4 @@
+use color_eyre::Result;
 use mongodb::bson::{doc, DateTime, Document};
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::channel::PermissionOverwriteType;
@@ -7,12 +8,11 @@ use serenity::model::prelude::interaction::application_command::{
 };
 use serenity::model::prelude::{ChannelId, GuildId, PermissionOverwrite, Role, RoleId};
 use serenity::model::Permissions;
-
-use color_eyre::Result;
 use serenity::prelude::Context;
 use tracing::info;
 
 use crate::api::bot::Bot;
+
 pub fn register(cmd: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     cmd.create_option(|option| {
         option
@@ -79,7 +79,7 @@ pub async fn run(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
     let res = match sub_cmd_name {
         "add" => add(&subcommand.options, ctx, bot).await?,
         "repost" => repost(&subcommand.options, ctx, bot).await?,
-        _ => panic!("Unknown subcommand"),
+        _ => return Err(eyre::eyre!("Invalid subcommand provided")),
     };
 
     Ok(res)
@@ -103,7 +103,7 @@ pub async fn add(options: &[CommandDataOption], ctx: &Context, bot: &Bot) -> Res
 
 fn test_emoji(emoji: &str) -> bool {
     let test_reg = regex::Regex::new(r"\p{Extended_Pictographic}");
-    let Ok(test_reg) = test_reg else { return false};
+    let Ok(test_reg) = test_reg else { return false; };
     info!("Testing emoji: {}", emoji);
     test_reg.is_match(emoji)
 }

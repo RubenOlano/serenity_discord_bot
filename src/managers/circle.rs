@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use serenity::{
     builder::{CreateActionRow, CreateButton, CreateEmbed},
     model::prelude::{
-        component::ButtonStyle, interaction::message_component::MessageComponentInteraction,
-        Channel, ChannelId, GuildId, ReactionType, RoleId,
+        Channel, ChannelId,
+        component::ButtonStyle, GuildId, interaction::message_component::MessageComponentInteraction, ReactionType, RoleId,
     },
     prelude::Context,
 };
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 use urlencoding::encode;
 
 use crate::{api::schema::circle::Circle, settings::Settings};
@@ -32,7 +32,10 @@ impl CircleManager {
             guild_id: GuildId(settings.guild),
         }
     }
+
+    #[instrument(skip(self, ctx))]
     pub async fn repost(&self, ctx: &Context) -> Result<()> {
+        debug!("Reposting circles");
         let channel = ctx.http.get_channel(self.join_channel.into()).await?;
         self.delete_original(ctx, &channel).await?;
         self.send_header(ctx, &channel).await?;
@@ -43,6 +46,7 @@ impl CircleManager {
             .ok_or(eyre::eyre!("Unable to get cache"))?;
 
         for c in circles.values() {
+            debug!("Posting circle: {}", c.name);
             let (embed, action_row) = self.send_circle_card(ctx, c.clone()).await?;
             channel
                 .id()
@@ -56,6 +60,7 @@ impl CircleManager {
         Ok(())
     }
 
+    #[instrument(skip(self, ctx, channel))]
     async fn delete_original(&self, ctx: &Context, channel: &Channel) -> Result<()> {
         let msgs = ctx
             .http
@@ -75,6 +80,7 @@ impl CircleManager {
         Ok(())
     }
 
+    #[instrument(skip(self, ctx, channel))]
     async fn send_header(&self, ctx: &Context, channel: &Channel) -> Result<()> {
         let circle_header = "https://cdn.discordapp.com/attachments/537776612238950410/826695146250567681/circles.png";
 
@@ -94,10 +100,11 @@ impl CircleManager {
             .id()
             .send_message(&ctx.http, |m| m.content(circle_body))
             .await?;
-
+        debug!("Sent header");
         Ok(())
     }
 
+    #[instrument(skip(self, ctx, c))]
     async fn send_circle_card(
         &self,
         ctx: &Context,
@@ -170,6 +177,7 @@ impl CircleManager {
         Ok((embed, action_row))
     }
 
+    #[instrument(skip(self, ctx, c))]
     async fn get_member_count(&self, ctx: &Context, c: &Circle) -> Result<i32> {
         let guild = ctx.http.get_guild(self.guild_id.into()).await?;
 
@@ -178,16 +186,15 @@ impl CircleManager {
             .role_by_name(format!("{} {}", c.emoji, c.name).as_str())
             .ok_or(eyre::eyre!("Unable to get role"))?;
 
-        let mut count = 0;
-        for member in members {
-            if member.roles.contains(&role.id) {
-                count += 1;
-            }
-        }
+        let count = members
+            .iter()
+            .filter(|m| m.roles.contains(&role.id))
+            .count() as i32;
 
         Ok(count)
     }
 
+    #[instrument(skip(self, ctx))]
     pub async fn handle_button(
         &self,
         ctx: &Context,
@@ -212,14 +219,14 @@ impl CircleManager {
         let circle = self.get_circle(ctx, circle_id).await?;
 
         let res = match action {
-            "join" => self.handle_join(ctx, &circle, &int).await?,
+            "join" => self.handle_join(ctx, &circle, int).await?,
             _ => "Unable to get action".to_owned(),
         };
 
         Ok(res)
     }
 
-    #[instrument(skip(self, ctx), fields(circle_id = %circle_id))]
+    #[instrument(skip(self, ctx))]
     async fn get_circle(&self, ctx: &Context, circle_id: &str) -> Result<Circle> {
         let data = ctx.data.read().await;
         let circles = data
@@ -232,7 +239,7 @@ impl CircleManager {
         Ok(circle.to_owned())
     }
 
-    #[instrument(skip(self, ctx, c, int), fields(circle_id = %c.id))]
+    #[instrument(skip(self, ctx))]
     async fn handle_join(
         &self,
         ctx: &Context,
@@ -241,10 +248,7 @@ impl CircleManager {
     ) -> Result<String> {
         let mut member = self.guild_id.member(&ctx.http, int.user.id).await?;
 
-        let channel = ctx
-            .http
-            .get_channel(c.channel.parse::<u64>()?.into())
-            .await?;
+        let channel = ctx.http.get_channel(c.channel.parse::<u64>()?).await?;
 
         let role_id: RoleId = c.id.parse::<u64>()?.into();
         if member.roles.contains(&role_id) {

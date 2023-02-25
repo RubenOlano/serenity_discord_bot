@@ -1,5 +1,6 @@
-use super::super::settings::Settings;
 use firestore::FirestoreDb;
+
+use super::super::settings::Settings;
 
 pub struct FSManager {
     pub client: FirestoreDb,

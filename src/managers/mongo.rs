@@ -110,7 +110,7 @@ impl Mongo {
                 &coper.id,
                 doc! { "$set": { "score": new_coper.score } },
             )
-            .await?;
+                .await?;
         } else {
             let new_coper = Coper {
                 id: coper_id.to_string(),

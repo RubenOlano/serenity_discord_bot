@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use mongodb::bson::doc;
 use mongodb::bson::DateTime;
+use mongodb::bson::doc;
 use serde::Deserialize;
 use serde_derive::Serialize;
 use serenity::prelude::TypeMapKey;

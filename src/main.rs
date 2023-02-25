@@ -1,16 +1,28 @@
+use std::{collections::HashMap, fs};
+
+use serenity::prelude::*;
+use tracing::{debug, warn};
+
+use api::{bot::Bot, schema::circle::Circle};
+
 mod api;
 mod commands;
 pub mod managers;
 mod settings;
-
-use std::collections::HashMap;
-
-use api::{bot::Bot, schema::circle::Circle};
-use serenity::prelude::*;
+mod util;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    fs::remove_file("./logs/acm-bot.log").unwrap();
+    color_eyre::install().unwrap();
+    let file = tracing_appender::rolling::never("./logs", "acm-bot.log");
+
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file);
+
+    let sub = tracing_subscriber::fmt().with_writer(non_blocking).finish();
+
+    tracing::subscriber::set_global_default(sub).expect("setting default subscriber failed");
+
     let bot = Bot::new().await;
 
     let intents = GatewayIntents::GUILDS
@@ -28,11 +40,12 @@ async fn main() {
         .await
         .expect("Err creating client");
     {
+        debug!("Starting the cache");
         let mut data = client.data.write().await;
         data.insert::<Circle>(HashMap::new());
     }
 
     if let Err(why) = client.start().await {
-        println!("Client error: {why:#?}");
+        warn!("Client error: {:#?}", why)
     }
 }
