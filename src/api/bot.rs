@@ -1,21 +1,22 @@
 use color_eyre::Report;
 use color_eyre::Result;
+use serenity::{
+    async_trait,
+    model::prelude::{
+        Activity,
+        component::ComponentType,
+        GuildId, interaction::{Interaction, InteractionResponseType}, Ready,
+    },
+    prelude::{Context, EventHandler},
+};
 use serenity::futures::stream::BoxStream;
 use serenity::futures::StreamExt;
 use serenity::model::application::interaction::message_component::MessageComponentInteraction;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
-use serenity::{
-    async_trait,
-    model::prelude::{
-        component::ComponentType,
-        interaction::{Interaction, InteractionResponseType},
-        Activity, GuildId, Ready,
-    },
-    prelude::{Context, EventHandler},
-};
 use tracing::{info, warn};
 
 use crate::{api::schema::circle::Circle, commands, managers::circle::CircleManager};
+use crate::managers::report::ReportManager;
 
 use super::super::managers::firestore::FSManager;
 use super::super::settings::Settings;
@@ -24,6 +25,7 @@ pub struct Bot {
     pub settings: Settings,
     pub firestore_manager: FSManager,
     pub circle_manager: CircleManager,
+    pub report_manager: ReportManager,
 }
 
 #[async_trait]
@@ -44,6 +46,7 @@ impl EventHandler for Bot {
                     cmd.name("recache").description("Recache the bot")
                 })
                 .create_application_command(|cmd| commands::ping::register(cmd))
+                .create_application_command(|cmd| commands::report::register(cmd))
         })
         .await
         .unwrap_or_else(|why| {
@@ -59,7 +62,7 @@ impl EventHandler for Bot {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        match interaction {
+        match &interaction {
             Interaction::ApplicationCommand(cmd) => {
                 if let Err(why) = self.handle_slash(&ctx, cmd).await {
                     warn!("Error handling slash command: {:?}", why);
@@ -80,10 +83,12 @@ impl Bot {
         let settings = Settings::new();
         let firestore_manager = FSManager::new().await;
         let circle_manager = CircleManager::new(&settings);
+        let report_manager = ReportManager::default();
         Self {
             settings,
             firestore_manager,
             circle_manager,
+            report_manager,
         }
     }
 
@@ -104,7 +109,7 @@ impl Bot {
         Ok("Recached".to_string())
     }
 
-    async fn handle_slash(&self, ctx: &Context, cmd: ApplicationCommandInteraction) -> Result<()> {
+    async fn handle_slash(&self, ctx: &Context, cmd: &ApplicationCommandInteraction) -> Result<()> {
         info!("Command: {:?}", cmd.data.name);
 
         let content = match cmd.data.name.as_str() {
@@ -112,6 +117,7 @@ impl Bot {
             "circle" => commands::circle::run(&cmd.data.options, ctx, self).await,
             "recache" => self.recache_ctx(ctx).await,
             "beep" => Ok(commands::ping::run()),
+            "report" => commands::report::run(ctx, &cmd, self).await,
             _ => Err(Report::msg("Unknown command")),
         };
 
@@ -147,7 +153,7 @@ impl Bot {
         }
         Ok(())
     }
-    async fn handle_button(&self, ctx: &Context, msg: MessageComponentInteraction) -> Result<()> {
+    async fn handle_button(&self, ctx: &Context, msg: &MessageComponentInteraction) -> Result<()> {
         if msg.data.component_type != ComponentType::Button {
             return Ok(());
         }

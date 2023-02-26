@@ -5,6 +5,8 @@ use tracing::{debug, warn};
 
 use api::{bot::Bot, schema::circle::Circle};
 
+use crate::managers::report::Report;
+
 mod api;
 mod commands;
 pub mod managers;
@@ -43,6 +45,7 @@ async fn main() {
         debug!("Starting the cache");
         let mut data = client.data.write().await;
         data.insert::<Circle>(HashMap::new());
+        data.insert::<Report>(HashMap::new());
     }
 
     if let Err(why) = client.start().await {
